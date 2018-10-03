@@ -1,0 +1,64 @@
+push <register>
+    copies the 16bit word from to the word pointed to by S
+    then decreases S by 2
+pop  <register> 
+    copies the 16bit word pointed to by S to <register> 
+    then increases S by 2
+
+Branching instructions:
+ * jmp (unconditional)
+ * je  (zf == 1) 
+ * jg  (zf == 0 and sf == of)
+ * jge (sf == of)
+ * jl  (zf == 0 and sf != of)
+ * jle (zf == 1 or  sf != of)
+ * jne (zf == 0) 
+    
+
+
+
+RENC: register
+IMME: immediate
+AMEM: absolute memory
+RENCMEM: dereferncing a pointer stored in a [register]
+
+
+dest: RENC
+op2: RENC or IMME
+ add
+ sub
+ or
+ xor
+ and
+ shr
+ shl
+
+dest: RENC
+ neg
+ not
+
+op1: RENC
+op2: RENC or IMME
+ cmp
+
+control:
+ op1: IMME
+ jcc (jmp,jle,jge...)
+
+no operands:
+ nop
+
+ in   (both out and in use A implictly as the source and destination)
+ out
+
+
+source: RENC, RENCMEM , AMEM or IMME
+dest: RENC
+ ldx
+source: RENC
+dest: RENCMEM or AMEM
+ stx
+registers only:
+op1: RENC
+ push
+ pop

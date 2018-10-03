@@ -1,0 +1,16 @@
+example usage:
+   ./assembler.py --in examples/example6.v --out prog
+   ./vcpu -r prog  #runs the program
+
+
+   with the slower examples you probably want to turn off the cycle limit:
+   ./vcpu -i -r prog  
+
+
+   there are couple of knobs you can tweak, 
+   and there are tons of untested instructions, and probably undiscovered bugs!
+    
+   out of the instructions listed in cpu.c
+
+   the following haven't been implemented:
+   stx,ldx, in, out

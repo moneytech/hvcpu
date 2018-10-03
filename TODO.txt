@@ -1,0 +1,3 @@
+test, it's not thoroughly tested 
+support ldx, stx instructions
+support in, out instructions

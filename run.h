@@ -1,8 +1,8 @@
 enum RUN_OPT{
 
     PRINT_REG = 1,
-    IGNORE_CYCLE = 2,
     DO_DUMP = 4,
+    PRINT_AT_END = 8,
 
 };
 void print_registers(int outfd, cpu_sim_s *cm);

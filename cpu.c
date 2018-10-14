@@ -8,6 +8,7 @@
 #include "data.h"
 #include "log.h"
 #include "cpu.h"
+#include "instructions_defs.h"
 
 instruction_sim_s instr[N_INSTR] = {0};
 const char    *mnem[N_INSTR] = {0};
@@ -148,12 +149,12 @@ void shli(cpu_sim_s *cm){
 
 void negi(cpu_sim_s *cm){
     reg_s *r1;
-    r1 = g_reg(cm, cm->ci.op8_1);
+    r1 = g_reg(cm, cm->ci.op8_2);
     r1->v = (~r1->v) + 1;
 }
 void noti(cpu_sim_s *cm){
     reg_s *r1;
-    r1 = g_reg(cm, cm->ci.op8_1);
+    r1 = g_reg(cm, cm->ci.op8_2);
     r1->v = ~(r1->v);
 }
 
@@ -192,14 +193,14 @@ void stxi(cpu_sim_s *cm){
     uint16_t *d;
     uint8_t addrmode = cm->ci.opcode & ADDRMMASK;
 
-    //r1 is source
+    //r1 is source (unusual, but we need it to support long addresses in r2)
     r1 = g_reg(cm, cm->ci.op8_1);
     //to be read as register to (addrmode)
     switch(addrmode){
-        case MEMA_M: 
+        case MEMA_M:  //absolute address
             d = vmem_addr(cm, cm->ci.op16_2);
             break;
-        case MEMI_M: 
+        case MEMI_M:  //register indirect
             r2 = g_reg(cm, cm->ci.op8_2);
             d = vmem_addr(cm, r2->v);
             break;
@@ -213,7 +214,6 @@ void stxi(cpu_sim_s *cm){
 void cmpi(cpu_sim_s *cm){
     reg_s *r1;
     uint16_t s = rencimme_source(cm);
-    //dest
     r1 = g_reg(cm, cm->ci.op8_1);
 
     setf_iff(cm, CARRY_F, r1->v < s);
@@ -248,7 +248,7 @@ static inline void do_step(cpu_sim_s *cm)
 }
 
 void hlti(cpu_sim_s *cm){
-    cm->cycles_sec = 0;
+    cm->end = 1;
 }
 
 void jcci(cpu_sim_s *cm)
@@ -322,7 +322,7 @@ void pushi(cpu_sim_s *cm)
     uint16_t *stackptr;
     stack = &cm->cpu.S;
     //source
-    r1 = g_reg(cm, cm->ci.op8_1);
+    r1 = g_reg(cm, cm->ci.op8_2);
     stack->v -= sizeof(uint16_t);
     stackptr = vmem_addr(cm, stack->v);
     *stackptr = r1->v;
@@ -332,7 +332,7 @@ void popi(cpu_sim_s *cm)
     reg_s *r1, *stack;
     uint16_t *stackptr;
     //dest
-    r1 = g_reg(cm, cm->ci.op8_1);
+    r1 = g_reg(cm, cm->ci.op8_2);
     stack = &cm->cpu.S;
     stackptr = vmem_addr(cm, stack->v);
     r1->v = *stackptr;
@@ -374,26 +374,13 @@ void outi(cpu_sim_s *cm)
     //dest
     */
     fputc(cm->cpu.A.v & 0xFF, stdout);
+    fflush(stdout);
     return;
 }
 
 
-//used for populating instr array
-typedef struct _defined_instruction_s{
-    uint8_t opcode;
-    instr_fx func;
-    const char *mnemonic;
-    //whether its defined for the address modes
-    char addr_immed;
-    char addr_reg;
-    char addr_mema;
-    char addr_memi;
-    char addr_na;
-} defined_instruction_s;
 
 
-
-#include "instructions_defs.h"
 
 void do_def_instr(defined_instruction_s *df)
 {
@@ -447,7 +434,8 @@ void init_cpu_sim_s(cpu_sim_s *cm)
     if (!cm->mem.mem)
         goto error;
     cm->mem.size = SIM_MEMSIZE;
-    cm->cycles_sec = 4;
+    cm->cycles_sec = 0;
+    cm->end = 0;
 
     return;
 error:

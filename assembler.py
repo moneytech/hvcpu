@@ -369,7 +369,8 @@ def encode_instruction(mnem, oprs, xyz):
             addrmode = ADDR_MODE['REG_M']
             op_code = quick_defs[mnem]['opcode_int'] + addrmode
             ins[0] = (op_code).to_bytes(1, 'little')[0]
-            ins[1] = r1.to_bytes(1, 'little')[0]
+            ins[1] = (0).to_bytes(1, 'little')[0]
+            ins[2] = r1.to_bytes(1, 'little')[0]
         elif (mnem in imm) and (oprs[0].otype == OT_IMMEDIATE_INTEGER):
             val = oprs[0].value
             addrmode = ADDR_MODE['IMMED_M']

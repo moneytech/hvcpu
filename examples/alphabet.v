@@ -1,17 +1,30 @@
 xor A, A
 xor B, B
-xor S, S
-add S, 1000 ; have a big enough stack
+ldx S, 1000 ; have a big enough stack
 
 
-add A, 5
-call FACTORIAL
+
+add     A, 5
+ldx     B, MSG1
+call    PRINTS
 hlt
 
+;prints the null termianted string pointed to by B
+PRINTS:
+    ldx     A, [B]
+    and     A, 0x00FF
+    cmp     A, 0
+    jz      PRINTS_END
+    out
+    add     B, 1
+    jmp     PRINTS
+PRINTS_END:
+    ret
+
+    
 
 
-;this should probably be implemented by shiftand addition :), it takes forever to execute
-;with larger numbers
+;this should probably be implemented by shiftand addition :), it takes forever to execute with larger numbers
 ;MUL procedure RETURNS IN C
 MUL:
     xor C, C
@@ -42,3 +55,6 @@ FACTORIAL_END:
     ret
 
     
+MSG1:
+    db "hello world",0xA,97, 0, 
+

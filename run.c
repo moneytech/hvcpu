@@ -89,17 +89,16 @@ void run_prog(const char *output, const char *progfile, cpu_sim_s *cm,  int opt)
 
         cm->cpu.IP.v += sizeof(instruction_s);
 
-        if (!cm->cycles_sec || cm->err){
+        if (cm->err || cm->end){
             break;
         }
-        if (!(opt & IGNORE_CYCLE)){
+        if (cm->cycles_sec){
             usleep(1e6 / cm->cycles_sec);
         }
     }
     if (cm->err){
         fprintf(stderr, "\nan error was encountered, IP: 0x%.4hx", cm->cpu.IP.v);
         print_registers(2,cm);
-        panic_exit("");
     }
     if (opt & DO_DUMP){
         int fd = open("dump.bin", O_WRONLY | O_CREAT | O_TRUNC);
@@ -110,6 +109,9 @@ void run_prog(const char *output, const char *progfile, cpu_sim_s *cm,  int opt)
         else{
             fprintf(stderr, "couldn't open file to dump mem\n");
         }
+    }
+    if (opt & PRINT_AT_END){
+        print_registers(2,cm);
     }
 
 }

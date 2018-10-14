@@ -26,8 +26,7 @@ enum FLAGS_F{
 0xF     0xF
 0000|0     000
 ^inst(0xF8) ^adrrmode (0x7)
- */
-/*
+
  all instructions are 32bit wide
  without using any fancy extensions
  there is space for only 32 instructions in the format, with 8 possible variants of each for addressing mode 
@@ -35,7 +34,7 @@ enum FLAGS_F{
 immed: 0x?0 OR 0x?8
 reg:   0x?1 OR 0x?9
 mem:   0x?2 or 0x?A
- */
+*/
 //and the opcode with ADDRMMASK to get these
 #define ADDRMMASK 0x7
 enum ADDR_MODE{
@@ -50,7 +49,7 @@ enum ADDR_MODE{
 
 /*
    register encoding:
- * */
+*/
 enum REG_ENC{
     ENC_A      = 1,
     ENC_B      = 2,
@@ -61,7 +60,7 @@ enum REG_ENC{
 };
 /*
    jmp conditions:
- * */
+*/
 enum JMP_COND{
     JMP_JMP   = 0x1, //unconditional
     JMP_L     = 0x2,
@@ -116,6 +115,7 @@ typedef struct _cpu_sim_s{
     int cycles_sec;
     int single_step;
     int err;
+    int end;
 } cpu_sim_s;
 
 

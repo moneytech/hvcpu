@@ -22,16 +22,17 @@ int main(int argc, const char **argv)
 
     cpu_sim_s cm;
     init_cpu_sim_s(&cm);
+    cm.cycles_sec = 0;
     int dis = 0;
     int run = 0;
-    int ignore_cycles = 0;
-    int ignore_print = 0;
+    int cycle_print = 0;
+    int end_print = 1;
     int do_dump = 0;
-    int set_cycles = 4;
+    int set_cycles = 0; //no limit
 
     opterr = 0;
 
-    while ((c = getopt (argc,  (char * const *)argv, "o:d:r:c:qmih")) != -1)
+    while ((c = getopt (argc,  (char * const *)argv, "o:d:r:c:vmh")) != -1)
         switch (c)
         {
         case 'o':
@@ -45,17 +46,17 @@ int main(int argc, const char **argv)
             in = optarg;
             run = 1;
             break;
-        case 'i':
-            ignore_cycles = 1;
-            break;
         case 'c':
             set_cycles = atoi(optarg);
             if (set_cycles <= 0){
                 panic_exit("cant set cycles to <= 0");
             }
             break;
-        case 'q':
-            ignore_print = 1;
+        case 'v':
+            cycle_print = 1;
+            break;
+        case 'e':
+            end_print = 0;
             break;
         case 'm':
             do_dump = 1;
@@ -78,14 +79,14 @@ int main(int argc, const char **argv)
         }
 
     int run_opt = 0x0;
-    if (ignore_cycles){
-        run_opt = run_opt | IGNORE_CYCLE;
-    }
-    if (!ignore_print){
+    if (cycle_print){
         run_opt = run_opt | PRINT_REG;
     }
     if (do_dump){
         run_opt = run_opt | DO_DUMP;
+    }
+    if (end_print){
+        run_opt = run_opt | PRINT_AT_END;
     }
     cm.cycles_sec = set_cycles;
     
@@ -123,9 +124,9 @@ void help(const char *msg)
             "   options:\n"
             "       -o [file] outfile\n"
             "       -d [file] dissassmeble\n"
-            "       -c [cycles] number of cycles/sec\n"
-            "       -q do not print register info with each cycle\n"
-            "       -i ignore limiting the cycle rate\n"
+            "       -c [cycles] limit number of cycles/sec\n"
+            "       -v print register info with each cycle\n"
+            "       -e dont print register at the end\n"
             "       -r [file] run\n", msg);
     exit(1);
 }

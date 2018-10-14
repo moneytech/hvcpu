@@ -1,3 +1,6 @@
+#include "cpu.h"
+
+//
 //can only use the range 0x00 to 0xF8 for major opcode
 //ok: 0x[0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F][8,0]
 defined_instruction_s defined_instr[] = {

@@ -1,16 +1,11 @@
 example usage:
-   ./assembler.py --in examples/example6.v --out prog
+    make
+   ./casm -i examples/adder.v -o prog
    ./vcpu -r prog  #runs the program
 
 
-   with the slower examples you probably want to turn off the cycle limit:
-   ./vcpu -i -r prog  
 
 
-   there are couple of knobs you can tweak, 
-   and there are tons of untested instructions, and probably undiscovered bugs!
-    
-   out of the instructions listed in cpu.c
+with cycle limiting to 50 cycles/second, the -v options prints the registers at each cycle:
+   ./vcpu -c 50 -v -r prog  
 
-   the following haven't been implemented:
-   stx,ldx, in, out

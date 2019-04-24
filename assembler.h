@@ -70,8 +70,6 @@ struct input_s{
     struct token_s t;
 };
 
-
-
 struct sym_s{
     char *name;
     int type;
@@ -83,42 +81,38 @@ enum DECLTYPES{
     DECL_LABEL,
 };
 
-//genericbuffer
 struct gbuffer_s{
     char *b;
     long len;
     long size;
 };
 
-
-#define DECL_HEAD \
-    int dtype
-
-
-
 struct instr_decl_s{
-    DECL_HEAD;
+    int dtype;
     int mnem_idx;
     struct token_s operands[INSTR_MAX_OPERANDS];
     int n_operands;
     int t8_enc; //only relevant for jmp instructions
 };
 struct data_decl_s{
-    DECL_HEAD;
+    int dtype;
     struct gbuffer_s gbuff;
 };
 struct label_decl_s{
-    DECL_HEAD;
+    int dtype;
     int sym_idx;
 };
-union decl_s{
-    DECL_HEAD;
-    struct instr_decl_s i;
-    struct data_decl_s d;
-    struct label_decl_s l;
+struct decl_s{
+    int dtype;
+    union {
+        struct instr_decl_s i;
+        struct data_decl_s d;
+        struct label_decl_s l;
+    } u;
+    struct token_s t;
 };
 struct decl_list_s{
-    union decl_s *decls;
+    struct decl_s *decls;
     int len;
     int size;
 };

@@ -1,0 +1,2 @@
+make
+make -C examples

@@ -22,7 +22,9 @@ do {\
         exit(1);\
     }\
 } while(0)
-void err(char *msg){
+void err(struct token_s *token, char *msg){
+    if (token)
+        fprintf(stderr, "near line: %d, ", token->lineno);
     fprintf(stderr, msg);
     fprintf(stderr, "\n");
     exit(1);
@@ -137,7 +139,7 @@ static int match_numeric(struct input_s *inps, int base, int offset)
         case 16:
             any = "0123456789abcdefABCDEF"; break;
         default:
-            err("invalid base");
+            err(&inps->t, "invalid base");
     }
     int idx = inps->idx + offset;
     int neg  = 0;
@@ -311,13 +313,13 @@ static int lex(struct input_s *inps){
     if (inp(idx) == '0' && (__isdigit(inp(idx+1)) || (inp(idx+1) == 'x') || (inp(idx+1) == 'b')) ){
         if (str_match(&inp(idx), "0x")){
             if (!match_numeric(inps, 16, 2))
-                err("expected a hexdecimal number after 0x");
+                err(&inps->t, "expected a hexdecimal number after 0x");
             inps->t.tok_type = T_IMMED_HEX;
             return T_IMMED_HEX;
         }
         if (str_match(&inp(idx), "0b")){
             if (!match_numeric(inps, 2, 2))
-                err("expected a binary number after 0b");
+                err(&inps->t, "expected a binary number after 0b");
             inps->t.tok_type = T_IMMED_BIN;
             return T_IMMED_BIN;
         }
@@ -367,7 +369,7 @@ static int lex(struct input_s *inps){
         case '"':
             n = match_string_literal(inps);
             if (n == T_NONE){
-                err("unterminated string literal");
+                err(&inps->t, "unterminated string literal");
             }
             return n;
             break;
@@ -418,12 +420,12 @@ static char *extract_token(struct token_s *tok, struct input_s *inps)
 static void represent_dlist(struct decl_list_s *dlist, struct symboltable_s *symtab)
 {
     for (int i=0; i<dlist->len; i++){
-        union decl_s *decl = &(dlist->decls[i]);
+        struct decl_s *decl = &(dlist->decls[i]);
         switch(decl->dtype){
             case DECL_INSTRUCTION:
-                aassert(decl->i.mnem_idx < instrdefs_len, "out of range instruction idx");
-                printf("(instr)    %s ", instrdefs[decl->i.mnem_idx].mnem);
-                for (int j=0; j<decl->i.n_operands; j++){
+                aassert(decl->u.i.mnem_idx < instrdefs_len, "out of range instruction idx");
+                printf("(instr)    %s ", instrdefs[decl->u.i.mnem_idx].mnem);
+                for (int j=0; j<decl->u.i.n_operands; j++){
                     if (j > 0){
                         printf(", ");
                     }
@@ -431,13 +433,13 @@ static void represent_dlist(struct decl_list_s *dlist, struct symboltable_s *sym
                 printf("\n");
                 break;
             case DECL_DATA:
-                printf("(data) %d bytes", decl->d.gbuff.len);
+                printf("(data) %d bytes", decl->u.d.gbuff.len);
                 printf("\n");
                 break;
             case DECL_LABEL:
-                printf("(label) name: '%s', type: %d, address: 0x%x\n", symtab->symbols[decl->l.sym_idx].name,
-                                                                        symtab->symbols[decl->l.sym_idx].type,
-                                                                        symtab->symbols[decl->l.sym_idx].address);
+                printf("(label) name: '%s', type: %d, address: 0x%x\n", symtab->symbols[decl->u.l.sym_idx].name,
+                                                                        symtab->symbols[decl->u.l.sym_idx].type,
+                                                                        symtab->symbols[decl->u.l.sym_idx].address);
 
                 break;
             default:
@@ -539,7 +541,7 @@ static void symboltable_init(struct symboltable_s *symtab)
 {
     symtab->symbols = malloc(sizeof(struct sym_s) * SYMTAB_INIT_SIZE);
     if (!symtab->symbols){
-        err("no memory for symboltable");
+        err(NULL, "no memory for symboltable");
     }
     symtab->len = 0;
     symtab->size = SYMTAB_INIT_SIZE;
@@ -556,24 +558,24 @@ static void symboltable_destroy(struct symboltable_s *symtab)
 static void decl_list_init(struct decl_list_s *dlist)
 {
     dlist->size = DECLLIST_INIT_SIZE;
-    dlist->decls = malloc(sizeof(union decl_s) * dlist->size);
+    dlist->decls = malloc(sizeof(struct decl_s) * dlist->size);
     if (!dlist->decls){
-        err("couldnt allocate memory for decl_list_init");
+        err(NULL, "couldnt allocate memory for decl_list_init");
     }
     dlist->len = 0;
 }
-static int decl_list_push(struct decl_list_s *dlist, union decl_s *decl)
+static int decl_list_push(struct decl_list_s *dlist, struct decl_s *decl)
 {
 
-    union decl_s *new_mem = NULL;
+    struct decl_s *new_mem = NULL;
     if (dlist->len == dlist->size){
-        new_mem = realloc(dlist->decls, sizeof(union decl_s) * dlist->size*2);
+        new_mem = realloc(dlist->decls, sizeof(struct decl_s) * dlist->size*2);
         if (!new_mem)
-            err("no memory when attempting to grow decllist");
+            err(NULL, "no memory when attempting to grow decllist");
         dlist->decls = new_mem;
         dlist->size *= 2;
     }
-    memcpy(dlist->decls + dlist->len, decl, sizeof(union decl_s));
+    memcpy(dlist->decls + dlist->len, decl, sizeof(struct decl_s));
     return dlist->len++;
 }
 static void decl_list_destroy(struct decl_list_s *dlist){
@@ -600,7 +602,7 @@ static int symboltable_push(struct symboltable_s *symtab, char *id, int type, in
     if (symtab->len == symtab->size){
         new_mem = realloc(symtab->symbols, sizeof(struct sym_s) * symtab->size*2);
         if (!new_mem)
-            err("no memory when attempting to grow symboltable");
+            err(NULL, "no memory when attempting to grow symboltable");
         symtab->symbols = new_mem;
         symtab->size *= 2;
     }
@@ -618,7 +620,7 @@ int gbuff_init(struct gbuffer_s *gbuf, long size)
 {
     gbuf->b = malloc(size);
     if (!gbuf->b){
-        err("gbuf_init(): no memory");
+        err(NULL, "gbuf_init(): no memory");
     }
     gbuf->size = size;
     gbuf->len = 0;
@@ -635,12 +637,12 @@ int gbuff_grow(struct gbuffer_s *gbuf, long atleast)
         return 1;
     long new_size = gbuf->size;
     if (new_size <= 0)
-        err("invalid size");
+        err(NULL, "invalid size");
     while(new_size < atleast)
         new_size *= 2;
     char *newmem = realloc(gbuf->b, new_size);
     if (!newmem)
-        err("gbuff_grow(): no mem");
+        err(NULL, "gbuff_grow(): no mem");
     gbuf->size = new_size;
     gbuf->b = newmem;
     return 1;
@@ -708,7 +710,7 @@ static void print_coords(struct token_s *tok, struct input_s *inps)
 #define CHECK_LIMIT() \
         if (n > INSTR_MAX_OPERANDS){\
             print_coords(&prs->token, prs->lexer);\
-            err("operands > INSTR_MAX_OPERANDS");\
+            err(NULL, "operands > INSTR_MAX_OPERANDS");\
         }
 
 //this includes literal immediates and symbols which resolve to their addresses
@@ -727,7 +729,7 @@ static int get_immediate(struct token_s *tok, struct parser_s *prs, long *lval){
     char *endptr = NULL;
     int symidx;
     if (!s){
-        err("get_immediate(): failed to extract token");
+        err(NULL, "get_immediate(): failed to extract token");
     }
     switch(tok->tok_type){
         case T_IMMED_BIN: 
@@ -770,18 +772,18 @@ invalid:
     return 0;
 }
 
-int instr_op_list(union decl_s *dest_decl, struct parser_s *prs)
+int instr_op_list(struct decl_s *dest_decl, struct parser_s *prs)
 {
     int t = prs->token.tok_type;
     int n = 0;
     while (1){
         if (is_immediate(&prs->token) && t != T_IDENTIFER){
             CHECK_LIMIT();
-            memcpy(&dest_decl->i.operands[n], &prs->token, sizeof(struct token_s));
+            memcpy(&dest_decl->u.i.operands[n], &prs->token, sizeof(struct token_s));
         }
         else if (t == T_IDENTIFER && !pla_match(prs, T_COLON)){
-            memcpy(&dest_decl->i.operands[n], &prs->token, sizeof(struct token_s));
-            dest_decl->i.operands[n].tok_associated_idx = -1;
+            memcpy(&dest_decl->u.i.operands[n], &prs->token, sizeof(struct token_s));
+            dest_decl->u.i.operands[n].tok_associated_idx = -1;
         }
         else if (t == T_BRACK_OPEN){
             CHECK_LIMIT();
@@ -789,27 +791,27 @@ int instr_op_list(union decl_s *dest_decl, struct parser_s *prs)
             if (t == T_REGISTER ||
                 (is_immediate(&prs->token) && t != T_IDENTIFER))
             {
-                memcpy(&dest_decl->i.operands[n], &prs->token, sizeof(struct token_s));
-                dest_decl->i.operands[n].tok_modifier |= TINFO_INDIRECT;
+                memcpy(&dest_decl->u.i.operands[n], &prs->token, sizeof(struct token_s));
+                dest_decl->u.i.operands[n].tok_modifier |= TINFO_INDIRECT;
                 t = pnext(prs); //skip whats inside it
                 if (t != T_BRACK_CLOS){
                     print_coords(&prs->token, prs->lexer);\
-                    err("expected ]");\
+                    err(&prs->token, "expected ]");\
                 }
             }
             else{
                 print_coords(&prs->token, prs->lexer);\
-                err("invalid indirect value");\
+                err(&prs->token, "invalid indirect value");\
             }
         }
         else if (t == T_REGISTER){
             CHECK_LIMIT();
-            memcpy(&dest_decl->i.operands[n], &prs->token, sizeof(struct token_s));
+            memcpy(&dest_decl->u.i.operands[n], &prs->token, sizeof(struct token_s));
         }
         else{
             if (n > 0){ //this must match, so its an error
                 print_coords(&prs->token, prs->lexer);\
-                err("unexpected token");\
+                err(&prs->token, "unexpected token");\
             }
             //otherwise there are no operands
             aassert(n == 0, "expected n to be 0");
@@ -826,17 +828,17 @@ int instr_op_list(union decl_s *dest_decl, struct parser_s *prs)
         t = prs->token.tok_type;
     }
     
-    dest_decl->i.n_operands = n;
+    dest_decl->u.i.n_operands = n;
     return n;
 }
 
-int data_op_list(union decl_s *dest_decl, struct parser_s *prs, int bytes)
+int data_op_list(struct decl_s *dest_decl, struct parser_s *prs, int bytes)
 {
     aassert(bytes < 2, "invalid argument bytes, expected 1 or 2");
     const int byte_max[3] = {0,255, 65535};
     int t;
     int n = 0;
-    struct data_decl_s *ddecl = &dest_decl->d;
+    struct data_decl_s *ddecl = &dest_decl->u.d;
     long lval;
     uint16_t val;
     pnext(prs); //skip dataspecifier
@@ -846,7 +848,7 @@ int data_op_list(union decl_s *dest_decl, struct parser_s *prs, int bytes)
             if(!get_immediate(&prs->token, prs, &lval) || (lval > byte_max[bytes])){
                 fprintf(stderr, "at data ");
                 print_coords(&prs->token, prs->lexer);
-                err("invalid immediate");
+                err(&prs->token, "invalid immediate");
             }
             /* printf("immd: %ld\n", lval); */
             //TODO, LITTLE ENDIAN ASSUMPTION
@@ -861,7 +863,7 @@ int data_op_list(union decl_s *dest_decl, struct parser_s *prs, int bytes)
         else{
             if (n == 0){ //this must match, so its an error
                 print_coords(&prs->token, prs->lexer);
-                err("expected data after dataspecifier");
+                err(&prs->token, "expected data after dataspecifier");
             }
             break; //trailing comma is allowed on n > 0
         }
@@ -875,7 +877,7 @@ int data_op_list(union decl_s *dest_decl, struct parser_s *prs, int bytes)
         }
     }
     
-    dest_decl->i.n_operands = n;
+    dest_decl->u.i.n_operands = n;
     return n;
 }
 
@@ -883,57 +885,57 @@ int data_op_list(union decl_s *dest_decl, struct parser_s *prs, int bytes)
 #undef CHECK_LIMIT
 
 
-int instr_def(union decl_s *dest_decl, struct parser_s *prs)
+int instr_def(struct decl_s *dest_decl, struct parser_s *prs)
 {
     aassert(prs->token.tok_type == T_MNEM, "instr_def(): expected an instruction");
     dest_decl->dtype = DECL_INSTRUCTION;
-    dest_decl->i.t8_enc = 0;
+    dest_decl->u.i.t8_enc = 0;
     char *buff = prs->lexer->input;
     int mnem_idx = findn_instr(buff+prs->token.tok_beg, prs->token.tok_end - prs->token.tok_beg);
     int which, matchlen;
     if (mnem_idx == -1){
         if ((which = keywordmatch(buff+prs->token.tok_beg, jmps, &matchlen))){
             mnem_idx = find_instr("jcc");
-            dest_decl->i.t8_enc = which;
+            dest_decl->u.i.t8_enc = which;
             aassert(mnem_idx != 0, "jcc instr def was not found");
         }
         else{
             print_coords(&prs->token, prs->lexer);
-            err("invalid instruction");
+            err(&prs->token, "invalid instruction");
         }
     }
     pnext(prs);
-    dest_decl->i.mnem_idx = mnem_idx;
+    dest_decl->u.i.mnem_idx = mnem_idx;
     instr_op_list(dest_decl, prs);
 
     return 1;
 }
 
-int data_def(union decl_s *dest_decl, struct parser_s *prs)
+int data_def(struct decl_s *dest_decl, struct parser_s *prs)
 {
     aassert(prs->token.tok_type == T_DATA_BYTE, "data_def(): datatype specifier");
     dest_decl->dtype = DECL_DATA;
-    gbuff_init(&(dest_decl->d.gbuff), 8);
+    gbuff_init(&(dest_decl->u.d.gbuff), 8);
     data_op_list(dest_decl, prs, 1);
     return 1;
 }
 
-int label_def(union decl_s *dest_decl, struct parser_s *prs)
+int label_def(struct decl_s *dest_decl, struct parser_s *prs)
 {
     aassert(prs->token.tok_type == T_IDENTIFER, "label_def(): expected a label");
     dest_decl->dtype = DECL_LABEL;
     char *label = extract_token(&prs->token, prs->lexer);
     if (!label){
-        err("not enough memory / error while storing label");
+        err(NULL, "not enough memory / error while storing label");
     }
     int idx = symboltable_push(&prs->symtab, label, SYMLABEL, -1);
     if (idx < 0 ){
-        err("couldnt add symbol, (symboltable_push())");
+        err(NULL, "couldnt add symbol, (symboltable_push())");
     }
-    dest_decl->l.sym_idx = idx;
+    dest_decl->u.l.sym_idx = idx;
     if (pnext(prs) != T_COLON){
         print_coords(&prs->token, prs->lexer);
-        err("expected colon after identifier");
+        err(NULL, "expected colon after identifier");
     }
     pnext(prs); //skip colon
     return 1;
@@ -941,9 +943,10 @@ int label_def(union decl_s *dest_decl, struct parser_s *prs)
 
 int statement_list(struct parser_s *prs){
     int n = 0;
-    union decl_s ldecl; //temp
+    struct decl_s ldecl; //temp
     while(1){
-        memset(&ldecl, 0, sizeof(union decl_s));
+        memset(&ldecl, 0, sizeof(struct decl_s));
+        ldecl.t = prs->token;
         if (pmatch(prs, T_MNEM)){
             instr_def(&ldecl, prs);
             decl_list_push(&prs->dlist, &ldecl);
@@ -960,7 +963,7 @@ int statement_list(struct parser_s *prs){
             if (prs->token.tok_type != T_END){
                 fprintf(stderr, "unexpected token: ");
                 print_coords(&prs->token, prs->lexer);
-                err("unknown token");
+                err(&prs->token, "unknown token");
             }
             break;
         }
@@ -979,14 +982,14 @@ void read_file(FILE *f, char **ptr, long *bfsize, long *read)
     long last_read = 0, total_read = 0, size = 8;
     char *buff = malloc(size+1);
     if (!buff)
-        err("no mem");
+        err(NULL, "no mem");
     last_read = fread(buff+total_read, 1, size-total_read, f);
     while(last_read > 0){
         total_read += last_read;
         size *= 2;
         buff = realloc(buff, size+1);
         if (!buff)
-            err("realloc failed");
+            err(NULL, "realloc failed");
         last_read = fread(buff+total_read, 1, size-total_read, f);
     }
     *read = total_read;
@@ -1033,11 +1036,11 @@ uint8_t rname_encoding(struct token_s *tok, struct input_s *inps){
     return enc;
 }
 
-uint32_t encode_instr(union decl_s *decl, struct parser_s *prs)
+uint32_t encode_instr(struct decl_s *decl, struct parser_s *prs)
 {
     //TODO, make it portable, now only works in little endian machines
     aassert(decl->dtype == DECL_INSTRUCTION, "invalid decl type");
-    struct instr_decl_s *instr = (struct instr_decl_s *) decl;
+    struct instr_decl_s *instr = &decl->u.i;
     int midx = instr->mnem_idx;
     union encinstr encoded;
     long lval;
@@ -1050,7 +1053,7 @@ uint32_t encode_instr(union decl_s *decl, struct parser_s *prs)
         }
         else{
             fprintf(stderr, "instruction %s cannot be encoded with no operands ", instrdef->mnem);
-            err("");
+            err(NULL, "");
         }
     }
     else if (instr->n_operands == 1){
@@ -1064,28 +1067,28 @@ uint32_t encode_instr(union decl_s *decl, struct parser_s *prs)
             encoded.t8c = rname_encoding(&instr->operands[0], prs->lexer);
             if (!encoded.t8c){
                 fprintf(stderr, "at instruction %s ", instrdef->mnem);
-                err("invalid register name");
+                err(&decl->t, "invalid register name");
             }
         }
         else if (is_immediate(&instr->operands[0]) && keywordmatch(instrdef->mnem, imm, NULL)){
             encoded.t8a = instrdef->major_op + IMMED_M;
             if(!get_immediate(&instr->operands[0], prs, &lval)){
                 fprintf(stderr, "at instruction %s ", instrdef->mnem);
-                err("invalid immediate");
+                err(&decl->t, "invalid immediate");
             }
             //check if it fits
             encoded.t16b = lval;
         }
         else{
             fprintf(stderr, "instruction %s cannot be encoded with these operands", instrdef->mnem);
-            err("");
+            err(&decl->t, "");
         }
     }
     else if (instr->n_operands == 2){
         if(instr->t8_enc != 0){
             fprintf(stderr, "instruction %s cannot be encoded with these operands (invalid extension)",
                                                                                         instrdef->mnem);
-            err("");
+            err(&decl->t, "");
         }
         if (instr->operands[0].tok_type == T_REGISTER &&
                  instr->operands[1].tok_type == T_REGISTER &&
@@ -1097,7 +1100,7 @@ uint32_t encode_instr(union decl_s *decl, struct parser_s *prs)
             encoded.t8c = rname_encoding(&instr->operands[1], prs->lexer);
             if (!encoded.t8b || !encoded.t8c){
                 fprintf(stderr, "at instruction %s ", instrdef->mnem);
-                err("invalid register name");
+                err(&decl->t, "invalid register name");
             }
         }
         else if (instr->operands[0].tok_type == T_REGISTER &&
@@ -1110,7 +1113,7 @@ uint32_t encode_instr(union decl_s *decl, struct parser_s *prs)
             encoded.t8c = rname_encoding(&instr->operands[0], prs->lexer);
             if (!encoded.t8b || !encoded.t8c){
                 fprintf(stderr, "at instruction %s ", instrdef->mnem);
-                err("invalid register name");
+                err(&decl->t, "invalid register name");
             }
         }
         else if (instr->operands[0].tok_type == T_REGISTER &&
@@ -1122,7 +1125,7 @@ uint32_t encode_instr(union decl_s *decl, struct parser_s *prs)
             encoded.t8c = rname_encoding(&instr->operands[1], prs->lexer);
             if (!encoded.t8b || !encoded.t8c){
                 fprintf(stderr, "at instruction %s ", instrdef->mnem);
-                err("invalid register name");
+                err(&decl->t, "invalid register name");
             }
         }
         else if (instr->operands[0].tok_type == T_REGISTER &&
@@ -1133,18 +1136,18 @@ uint32_t encode_instr(union decl_s *decl, struct parser_s *prs)
             encoded.t8b = rname_encoding(&instr->operands[0], prs->lexer);
             if(!get_immediate(&instr->operands[1], prs, &lval)){
                 fprintf(stderr, "at instruction %s ", instrdef->mnem);
-                err("invalid immediate");
+                err(&decl->t, "invalid immediate");
             }
             //check
             encoded.t16b = lval;
         }
         else{
             fprintf(stderr, "instruction %s cannot be encoded with these operands", instrdef->mnem);
-            err("");
+            err(&decl->t, "");
         }
     }
     else 
-        err("invalid number of operands");
+        err(&decl->t, "invalid number of operands");
     return encoded.t32;
 }
 
@@ -1158,21 +1161,21 @@ int assemble(struct parser_s *prs, FILE *out)
     //first pass, find addresses
     int address = 0;
     for(int i=0; i<prs->dlist.len; i++){
-        union decl_s *decl = &prs->dlist.decls[i];
+        struct decl_s *decl = &prs->dlist.decls[i];
         if (decl->dtype == DECL_INSTRUCTION){
             address += 4; //32bit
         }
         else if (decl->dtype == DECL_DATA){
-            address += decl->d.gbuff.len;
+            address += decl->u.d.gbuff.len;
         }
         else if (decl->dtype == DECL_LABEL){
-            prs->symtab.symbols[decl->l.sym_idx].address = address;
+            prs->symtab.symbols[decl->u.l.sym_idx].address = address;
         }
     }
     gbuff_grow(&gbuf, address);
     address = 0;
     for(int i=0; i<prs->dlist.len; i++){
-        union decl_s *decl = &prs->dlist.decls[i];
+        struct decl_s *decl = &prs->dlist.decls[i];
         uint32_t instr;
         if (decl->dtype == DECL_INSTRUCTION){
             address += 4; //32bit
@@ -1180,9 +1183,9 @@ int assemble(struct parser_s *prs, FILE *out)
             gbuff_memcpy(&gbuf, &instr, sizeof(uint32_t));
         }
         else if (decl->dtype == DECL_DATA){
-            address += decl->d.gbuff.len;
-            gbuff_memcpy(&gbuf, decl->d.gbuff.b, decl->d.gbuff.len);
-            gbuff_free(&decl->d.gbuff);
+            address += decl->u.d.gbuff.len;
+            gbuff_memcpy(&gbuf, decl->u.d.gbuff.b, decl->u.d.gbuff.len);
+            gbuff_free(&decl->u.d.gbuff);
         }
     }
     long written  = fwrite(gbuf.b, 1, gbuf.len, out);
@@ -1232,7 +1235,7 @@ int main(int argc, const char **argv){
         if (!in){
             fprintf(stderr, "couldnt open input file %s", fin_path);
             perror("fopen: ");
-            err("");
+            err(NULL, "");
         }
     }
     else{
@@ -1244,7 +1247,7 @@ int main(int argc, const char **argv){
         if (!out){
             fprintf(stderr, "couldnt open output file %s", fout_path);
             perror("fopen: ");
-            err("");
+            err(NULL, "");
         }
     }
     else{
@@ -1253,7 +1256,7 @@ int main(int argc, const char **argv){
 
     read_file(in, &filecontent, &fbfsize, &flen);
     if (!filecontent){
-        err("couldn't read file content\n");
+        err(NULL, "couldn't read file content\n");
     }
     struct input_s inps = {
         .input = filecontent,

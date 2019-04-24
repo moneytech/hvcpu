@@ -39,9 +39,12 @@ push A
 ldx B, MSG3 
 call PRINTS
 pop A
+push A
+call PRINT_INTEGER
+pop A
 hlt
 
-;to debug add this anywhere, it doesnt modify the state of whats surrounding it
+;to debug add this anywhere while running in -v mode, it doesnt modify the state of whats surrounding it
     push A
     in
     pop A
@@ -49,7 +52,6 @@ hlt
 
 ;prints the null termianted string pointed to by B
 PRINTS:
-
     PPRINTS:
     ldx     A, [B]
     and     A, 0x00FF
@@ -104,6 +106,24 @@ MUL_LOOP:
     jnz MUL_LOOP
 MUL_RET:
     ret
+
+;DIV procedure, input: A/B, remainder in B, quotient in A
+DIV:
+    xor C, C
+    cmp B, 0
+    jnz DIV_LOOP
+    hlt ;division by 0
+DIV_LOOP:
+    cmp A, B
+    jl  DIV_END
+    add C, 1
+    sub A, B
+    jmp DIV_LOOP
+DIV_END:
+    ldx B, A
+    ldx A, C
+    ret
+
 
 
 ;converts the string at B to an integer in A
@@ -162,9 +182,52 @@ ATOI_END:
 
 
 
+;PRINT_INTEGER procedure, takes integer in A
+PRINT_INTEGER:
+    ldx B, S
+    sub B, 100
+    ldx C, 0x000a
+    stx [B], C
+    call PRINT_SUBPROC
+    ret
+PRINT_SUBPROC:
+    sub B, 1
+    cmp A, 10
+    jl  PRINT_SUBPROC_END
+    push B ;mem ptr
+    ldx B, 10
+    call DIV
+    push A ; quotient
+    ldx A, B ;A = remainder
+    pop C ; C = quotient
+    pop B ; mem ptr
+    push C ; quotient
+    ldx C, [B]
+    and C, 0xFF00 ; keep only the previous byte
+    add C, 48 ; ascii '0'
+    add C, A ; remainder digit
+    stx [B], C
+    pop A ; quotient
+    call PRINT_SUBPROC
+    ret
+PRINT_SUBPROC_END:
+    ldx C, [B]
+    and C, 0xFF00 ; keep only the previous byte (MSb little endian)
+    add C, 48 ; ascii '0'
+    add C, A ;digit
+    stx [B], C
+    call PRINTS
+    hlt
+    add S, 1
+    ret
+
+
+
+
+
     
 MSG2: db 0xA
 MSG1:
       db "enter a number:", 0xA, 0, 
-MSG3: db "n1 + n2 = (meh, we dont have a print function, its in A) :)",0xA, 0
+MSG3: db "n1 + n2 = ",0xA, 0
 
